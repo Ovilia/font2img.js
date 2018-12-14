@@ -25,6 +25,7 @@
   "homepage": "https://github.com/Ovilia/font2img.js#readme",
   "dependencies": {
     "canvas": "^2.2.0",
-    "commander": "^2.19.0"
+    "commander": "^2.19.0",
+    "rimraf": "^2.6.2"
   }
 }

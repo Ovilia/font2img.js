@@ -4,15 +4,55 @@ const {createCanvas, registerFont} = require('canvas');
 const FONT_FAMILY = 'customed';
 
 module.exports = function font2img(options) {
-    console.log('working', options);
+    let fontPath = options.fontPath;
+    if (fs.lstatSync(fontPath).isDirectory()) {
+        fontPath = getFileDirectoryName(fontPath);
+
+        let outputPath = options.output || 'output';
+        if (fs.existsSync(outputPath)
+            && !fs.lstatSync(outputPath).isDirectory())
+        {
+            // If output is not dir, remove it
+            fs.unlinkSync(outputPath);
+            fs.mkdirSync(outputPath);
+        }
+        else if (!fs.existsSync(outputPath)) {
+            fs.mkdirSync(outputPath);
+        }
+        outputPath = getFileDirectoryName(outputPath);
+
+        fs.readdirSync(fontPath).forEach(file => {
+            const suffixId = file.lastIndexOf('.');
+            const outputName = suffixId ? file.substr(0, suffixId) : file;
+
+            options.output = outputPath + outputName;
+            options.fontPath = fontPath + file;
+            convertOneFont(options);
+        });
+    }
+    else {
+        convertOneFont(options);
+    }
+};
+
+function convertOneFont (options) {
+    console.log('Working on', options.fontPath);
 
     let {
         fontPath, output, text, color, fontSize,
         canvasWidth, canvasHeight, dpr, offsetX, offsetY
     } = options;
-    console.log(options);
+
+    if (fontPath.indexOf('.ttf') < 0) {
+        console.error('[Error]: Font path should be end with *.ttf.');
+        return;
+    }
 
     output = output || './output.png';
+    if (output.lastIndexOf('.png') !== output.length - '.png'.length) {
+        output += '.png';
+    }
+
     color = color || 'black';
     fontSize = fontSize || '12px';
     canvasWidth = canvasWidth;
@@ -66,4 +106,23 @@ function getBoundingBox(fontPath, fontSize, text) {
         width: Math.floor(measure.width),
         height: Math.floor(measure.actualBoundingBoxAscent)
     };
+}
+
+/**
+ * Append '/' to the end of directory name, if not exists
+ *
+ * @param {string} dir directory name in the form of xxx or xxx/
+ * @return {string} directory name in the form of xxx/
+ */
+function getFileDirectoryName(dir) {
+    if (!dir) {
+        return dir;
+    }
+
+    if (dir[dir.length - 1] !== '/') {
+        return dir + '/';
+    }
+    else {
+        return dir;
+    }
 }
