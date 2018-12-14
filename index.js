@@ -14,6 +14,7 @@ program
     .option('--dpr <number>', 'Canvas DPR, output scales')
     .option('-x, --offset-x <number>', 'Text horizontal offset')
     .option('-y, --offset-y <number>', 'Text vertical offset')
+    .option('-b, --bleeding <number>', 'Bleeding pixels')
     .action(function(file) {
         font2img({
             fontPath: program.fontPath,
@@ -25,7 +26,8 @@ program
             canvasHeight: program.canvasHeight,
             dpr: program.dpr,
             offsetX: program.offsetX,
-            offsetY: program.offsetY
+            offsetY: program.offsetY,
+            bleeding: program.bleeding
         });
     })
     .parse(process.argv);

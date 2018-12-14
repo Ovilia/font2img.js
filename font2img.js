@@ -1,8 +1,6 @@
 const fs = require('fs');
 const {createCanvas, registerFont} = require('canvas');
 
-const FONT_FAMILY = 'customed';
-
 module.exports = function font2img(options) {
     let fontPath = options.fontPath;
     if (fs.lstatSync(fontPath).isDirectory()) {
@@ -40,11 +38,11 @@ function convertOneFont (options) {
 
     let {
         fontPath, output, text, color, fontSize,
-        canvasWidth, canvasHeight, dpr, offsetX, offsetY
+        canvasWidth, canvasHeight, dpr, offsetX, offsetY, bleeding
     } = options;
 
     if (fontPath.indexOf('.ttf') < 0) {
-        console.error('[Error]: Font path should be end with *.ttf.');
+        console.warn('[Warn]: Font path should be end with *.ttf. This file is ignored.');
         return;
     }
 
@@ -55,10 +53,11 @@ function convertOneFont (options) {
 
     color = color || 'black';
     fontSize = fontSize || '12px';
-    canvasWidth = canvasWidth;
-    canvasHeight = canvasHeight;
-    offsetX = offsetX || 0;
-    offsetY = offsetY || 0;
+    canvasWidth = +canvasWidth;
+    canvasHeight = +canvasHeight;
+    offsetX = +offsetX || 0;
+    offsetY = +offsetY || 0;
+    bleeding = bleeding == null ? 0.2 : +bleeding;
 
     dpr = parseInt(dpr, 10) || 1;
     if (dpr !== 1) {
@@ -67,45 +66,87 @@ function convertOneFont (options) {
         fontSize = parseInt(fontSize, 10) * 2 + unit;
     }
 
-    const boundingBox = getBoundingBox(fontPath, fontSize, text);
-    console.log(boundingBox);
+    const fontName = 'custom-' + new Date().getTime();
+    const boundingBox = getBoundingBox(fontName, fontPath, fontSize, text);
 
     const canvas = createCanvas(
-        canvasWidth || boundingBox.width,
-        canvasHeight || boundingBox.height
+        (canvasWidth || boundingBox.width) * (1 + bleeding * 2),
+        (canvasHeight || boundingBox.height) * (1 + bleeding * 2)
     );
     const ctx = canvas.getContext('2d');
 
+    // ctx.fillStyle = 'white';
+    // ctx.fillRect(0, 0, canvas.width, canvas.height);
+
     ctx.fillStyle = color;
 
-    registerFont(fontPath, {
-        family: FONT_FAMILY
-    });
-    ctx.font = fontSize + ' ' + FONT_FAMILY;
+    ctx.font = fontSize + ' ' + fontName;
 
-    ctx.fillText(text, offsetX, boundingBox.height + offsetY);
-    const base64 = canvas.toDataURL('image/png');
+    ctx.textBaseline = 'top';
+    ctx.fillText(text, canvas.width * bleeding + offsetX,
+        canvas.height * bleeding + offsetY);
 
+    const trimedCanvas = trimCanvas(canvas);
+    const base64 = trimedCanvas.toDataURL('image/png');
     const data = base64.replace(/^data:image\/\w+;base64,/, '');
     const buf = Buffer.from(data, 'base64');
     fs.writeFileSync(output, buf);
 }
 
-function getBoundingBox(fontPath, fontSize, text) {
+function getBoundingBox(fontName, fontPath, fontSize, text) {
+    registerFont(fontPath, {
+        family: fontName,
+        weight: 'bolder'
+    });
+
     const canvas = createCanvas(1, 1);
     const ctx = canvas.getContext('2d');
-
-    registerFont(fontPath, {
-        family: FONT_FAMILY
-    });
-    ctx.font = fontSize + ' ' + FONT_FAMILY;
+    ctx.font = fontSize + ' ' + fontName;
 
     const measure = ctx.measureText(text);
+    measure.height = Math.ceil(measure.emHeightAscent);
+    console.log(measure);
 
-    return {
-        width: Math.floor(measure.width),
-        height: Math.floor(measure.actualBoundingBoxAscent)
-    };
+    return measure;
+}
+
+/**
+ * Trim empty borders in canvas
+ * Code from: https://gist.github.com/timdown/021d9c8f2aabc7092df564996f5afbbf
+ */
+function trimCanvas(canvas) {
+    function rowBlank(imageData, width, y) {
+        for (var x = 0; x < width; ++x) {
+            if (imageData.data[y * width * 4 + x * 4 + 3] !== 0) return false;
+        }
+        return true;
+    }
+
+    function columnBlank(imageData, width, x, top, bottom) {
+        for (var y = top; y < bottom; ++y) {
+            if (imageData.data[y * width * 4 + x * 4 + 3] !== 0) return false;
+        }
+        return true;
+    }
+
+    var ctx = canvas.getContext('2d');
+    var width = canvas.width;
+    var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    var top = 0, bottom = imageData.height, left = 0, right = imageData.width;
+
+    while (top < bottom && rowBlank(imageData, width, top)) ++top;
+    while (bottom - 1 > top && rowBlank(imageData, width, bottom - 1)) --bottom;
+    while (left < right && columnBlank(imageData, width, left, top, bottom)) ++left;
+    while (right - 1 > left && columnBlank(imageData, width, right - 1, top, bottom)) --right;
+
+    var trimmed = ctx.getImageData(left, top, right - left, bottom - top);
+    var copy = createCanvas(trimmed.width, trimmed.height);
+    var copyCtx = copy.getContext('2d');
+    copy.width = trimmed.width;
+    copy.height = trimmed.height;
+    copyCtx.putImageData(trimmed, 0, 0);
+
+    return copy;
 }
 
 /**
