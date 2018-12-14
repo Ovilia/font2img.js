@@ -1,0 +1,26 @@
+{
+  "name": "font2img",
+  "version": "1.0.0",
+  "description": "Command line tool to generate images from TTF files",
+  "bin": {
+    "font2img": "./index.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ovilia/font2img.js.git"
+  },
+  "keywords": [
+    "ttf",
+    "font",
+    "canvas"
+  ],
+  "author": "Ovilia",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Ovilia/font2img.js/issues"
+  },
+  "homepage": "https://github.com/Ovilia/font2img.js#readme"
+}
