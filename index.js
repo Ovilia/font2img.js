@@ -11,6 +11,7 @@ program
     .option('-s, --font-size <size>', 'Font size, can be "12px" or other forms that Canvas supports')
     .option('-w, --canvas-width <number>', 'Canvas width, in pixels')
     .option('-h, --canvas-height <number>', 'Canvas height, in pixels')
+    .option('--dpr <number>', 'Canvas DPR, output scales')
     .option('-x, --offset-x <number>', 'Text horizontal offset')
     .option('-y, --offset-y <number>', 'Text vertical offset')
     .action(function(file) {
@@ -22,6 +23,7 @@ program
             fontSize: program.fontSize,
             canvasWidth: program.canvasWidth,
             canvasHeight: program.canvasHeight,
+            dpr: program.dpr,
             offsetX: program.offsetX,
             offsetY: program.offsetY
         });

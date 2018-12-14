@@ -8,7 +8,7 @@ module.exports = function font2img(options) {
 
     let {
         fontPath, output, text, color, fontSize,
-        canvasWidth, canvasHeight, offsetX, offsetY
+        canvasWidth, canvasHeight, dpr, offsetX, offsetY
     } = options;
     console.log(options);
 
@@ -19,6 +19,13 @@ module.exports = function font2img(options) {
     canvasHeight = canvasHeight;
     offsetX = offsetX || 0;
     offsetY = offsetY || 0;
+
+    dpr = parseInt(dpr, 10) || 1;
+    if (dpr !== 1) {
+        const unitIndex = fontSize.match(/\D/).index;
+        const unit = fontSize.substr(unitIndex);
+        fontSize = parseInt(fontSize, 10) * 2 + unit;
+    }
 
     const boundingBox = getBoundingBox(fontPath, fontSize, text);
     console.log(boundingBox);
