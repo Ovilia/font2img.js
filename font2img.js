@@ -38,8 +38,8 @@ function convertOneFont (options) {
     console.log('Working on', options.fontPath);
 
     let {
-        fontPath, output, text, color, fontSize,
-        canvasWidth, canvasHeight, dpr, offsetX, offsetY, bleeding
+        fontPath, output, text, color, fontSize, lineHeight,
+        canvasWidth, canvasHeight, dpr, maxWidth, offsetX, offsetY, bleeding
     } = options;
 
     if (fontPath.indexOf('.ttf') < 0) {
@@ -59,37 +59,64 @@ function convertOneFont (options) {
     offsetX = +offsetX || 0;
     offsetY = +offsetY || 0;
     bleeding = bleeding == null ? 0.2 : +bleeding;
+    lineHeight = parseFloat(lineHeight) || 1;
 
     dpr = parseInt(dpr, 10) || 1;
     if (dpr !== 1) {
         const unitIndex = fontSize.match(/\D/).index;
         const unit = fontSize.substr(unitIndex);
         fontSize = parseInt(fontSize, 10) * 2 + unit;
+
+        if (maxWidth) {
+            maxWidth = parseInt(maxWidth) * dpr;
+        }
     }
 
     var font = opentype.loadSync(fontPath);
 
     const fontName = 'custom-' + new Date().getTime();
-    const boundingBox = getBoundingBox(fontName, fontPath, fontSize, text);
+    const boundingBox = getBoundingBox(fontName, fontPath, fontSize, text, dpr);
+
+    const canvasSize = getCanvasSize(canvasWidth, canvasHeight, boundingBox, maxWidth, lineHeight);
+    console.log('canvas size:', canvasSize);
 
     const canvas = createCanvas(
-        (canvasWidth || boundingBox.width) * (1 + bleeding * 2),
-        (canvasHeight || boundingBox.height) * (1 + bleeding * 2)
+        canvasSize.width * (1 + bleeding * 2),
+        canvasSize.height || boundingBox.height * (1 + bleeding * 2)
     );
     const ctx = canvas.getContext('2d');
 
-    // copyCtx.fillStyle = 'white';
-    // copyCtx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.fillStyle = color;
-
+    const textArr = [];
+    let currentLine = '';
     ctx.font = fontSize + ' ' + fontName;
+    if (maxWidth && boundingBox.width > maxWidth) {
+        console.log(maxWidth, boundingBox.width);
+        // Multi lines
+        for (let i = 0; i < text.length; ++i) {
+            currentLine += text[i];
+            const lineMeasure = ctx.measureText(currentLine);
+            if (lineMeasure.width > maxWidth) {
+                textArr.push(currentLine);
+                currentLine = '';
+            }
+        }
+        if (currentLine) {
+            textArr.push(currentLine);
+        }
+    }
+    else {
+        textArr.push(text);
+    }
 
-    font.draw(ctx, text,
-        Math.ceil(canvas.width * bleeding + offsetX),
-        Math.ceil(canvas.height * bleeding + offsetY + boundingBox.height),
-        parseInt(fontSize, 10));
-    console.log(canvas.width, canvas.height);
+    for (let i = 0; i < textArr.length; ++i) {
+        const path = font.getPath(textArr[i],
+            Math.ceil(canvas.width * bleeding + offsetX),
+            Math.ceil(canvas.height * bleeding + offsetY
+                + boundingBox.height * (i + 1) * lineHeight),
+            parseInt(fontSize, 10));
+        path.fill = color;
+        path.draw(ctx);
+    }
 
     const trimedCanvas = trimCanvas(canvas);
     const base64 = trimedCanvas.toDataURL('image/png');
@@ -99,7 +126,7 @@ function convertOneFont (options) {
     fs.writeFileSync(output, buf);
 }
 
-function getBoundingBox(fontName, fontPath, fontSize, text) {
+function getBoundingBox(fontName, fontPath, fontSize, text, dpr) {
     registerFont(fontPath, {
         family: fontName
     });
@@ -110,9 +137,28 @@ function getBoundingBox(fontName, fontPath, fontSize, text) {
 
     const measure = ctx.measureText(text);
     measure.height = Math.ceil(measure.emHeightAscent);
-    console.log(measure);
+
+    for (let attr in measure) {
+        measure[attr] *= dpr;
+    }
+    // console.log(measure);
 
     return measure;
+}
+
+function getCanvasSize(canvasWidth, canvasHeight, boundingBox, maxWidth, lineHeight) {
+    if (!maxWidth || canvasWidth || canvasHeight) {
+        return {
+            width: canvasWidth || boundingBox.width,
+            height: canvasHeight || boundingBox.height
+        };
+    }
+
+    const lines = Math.ceil(boundingBox.width / maxWidth);
+    return {
+        width: maxWidth,
+        height: Math.ceil(boundingBox.height * lines) * lineHeight
+    };
 }
 
 /**

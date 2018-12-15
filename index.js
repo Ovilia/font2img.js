@@ -12,6 +12,8 @@ program
     .option('-cw, --canvas-width <number>', 'Canvas width, in pixels')
     .option('-ch, --canvas-height <number>', 'Canvas height, in pixels')
     .option('--dpr <number>', 'Canvas DPR, output scales')
+    .option('--max-width <number>', 'Wrap into new lines if larger than this width')
+    .option('--line-height <number>', 'Percentage of line height, 1 for default')
     .option('-x, --offset-x <number>', 'Text horizontal offset')
     .option('-y, --offset-y <number>', 'Text vertical offset')
     .option('-b, --bleeding <number>', 'Bleeding pixels')
@@ -25,6 +27,8 @@ program
             canvasWidth: program.canvasWidth,
             canvasHeight: program.canvasHeight,
             dpr: program.dpr,
+            maxWidth: program.maxWidth,
+            lineHeight: program.lineHeight,
             offsetX: program.offsetX,
             offsetY: program.offsetY,
             bleeding: program.bleeding
