@@ -1,5 +1,6 @@
 const fs = require('fs');
 const {createCanvas, registerFont} = require('canvas');
+const opentype = require('opentype.js');
 
 module.exports = function font2img(options) {
     let fontPath = options.fontPath;
@@ -66,6 +67,8 @@ function convertOneFont (options) {
         fontSize = parseInt(fontSize, 10) * 2 + unit;
     }
 
+    var font = opentype.loadSync(fontPath);
+
     const fontName = 'custom-' + new Date().getTime();
     const boundingBox = getBoundingBox(fontName, fontPath, fontSize, text);
 
@@ -75,28 +78,30 @@ function convertOneFont (options) {
     );
     const ctx = canvas.getContext('2d');
 
-    // ctx.fillStyle = 'white';
-    // ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // copyCtx.fillStyle = 'white';
+    // copyCtx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.fillStyle = color;
 
     ctx.font = fontSize + ' ' + fontName;
 
-    ctx.textBaseline = 'top';
-    ctx.fillText(text, canvas.width * bleeding + offsetX,
-        canvas.height * bleeding + offsetY);
+    font.draw(ctx, text,
+        Math.ceil(canvas.width * bleeding + offsetX),
+        Math.ceil(canvas.height * bleeding + offsetY + boundingBox.height),
+        parseInt(fontSize, 10));
+    console.log(canvas.width, canvas.height);
 
     const trimedCanvas = trimCanvas(canvas);
     const base64 = trimedCanvas.toDataURL('image/png');
     const data = base64.replace(/^data:image\/\w+;base64,/, '');
     const buf = Buffer.from(data, 'base64');
+    console.log('Writing to file', output);
     fs.writeFileSync(output, buf);
 }
 
 function getBoundingBox(fontName, fontPath, fontSize, text) {
     registerFont(fontPath, {
-        family: fontName,
-        weight: 'bolder'
+        family: fontName
     });
 
     const canvas = createCanvas(1, 1);
