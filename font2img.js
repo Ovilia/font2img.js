@@ -3,7 +3,12 @@ const {createCanvas, registerFont} = require('canvas');
 const opentype = require('opentype.js');
 
 module.exports = function font2img(options) {
-    let fontPath = options.fontPath;
+    if (options.font.indexOf('.ttf') < 0 && options.font.indexOf('.otf') < 0) {
+        convertOneFont(options);
+        return;
+    }
+
+    let fontPath = options.font;
     if (fs.lstatSync(fontPath).isDirectory()) {
         fontPath = getFileDirectoryName(fontPath);
 
@@ -30,20 +35,21 @@ module.exports = function font2img(options) {
         });
     }
     else {
+        options.fontPath = options.font;
         convertOneFont(options);
     }
 };
 
 function convertOneFont (options) {
-    console.log('Working on', options.fontPath);
+    console.log('Working on', options.fontPath || options.font);
 
     let {
-        fontPath, output, text, color, fontSize, lineHeight,
+        fontPath, font, output, text, color, fontSize, lineHeight,
         canvasWidth, canvasHeight, dpr, maxWidth, offsetX, offsetY, bleeding
     } = options;
 
-    if (fontPath.indexOf('.ttf') < 0) {
-        console.warn('[Warn]: Font path should be end with *.ttf. This file is ignored.');
+    if (fontPath && fontPath.indexOf('.ttf') < 0 && fontPath.indexOf('.otf') < 0) {
+        console.warn('[Warn]: Font path should be end with *.ttf or *.otf. This file is ignored.');
         return;
     }
 
@@ -53,7 +59,12 @@ function convertOneFont (options) {
     }
 
     color = color || 'black';
+
     fontSize = fontSize || '12px';
+    if (fontSize.indexOf('px') < 0) {
+        throw new Error('font size should be in px.');
+    }
+
     canvasWidth = +canvasWidth;
     canvasHeight = +canvasHeight;
     offsetX = +offsetX || 0;
@@ -72,25 +83,33 @@ function convertOneFont (options) {
         }
     }
 
-    var font = opentype.loadSync(fontPath);
+    let fontObj;
+    let fontName;
+    if (fontPath) {
+        fontObj = opentype.loadSync(fontPath);
+        fontName = 'custom-' + new Date().getTime();
+        registerFont(fontPath, {
+            family: fontName
+        });
+    }
+    else {
+        fontName = font;
+    }
 
-    const fontName = 'custom-' + new Date().getTime();
-    const boundingBox = getBoundingBox(fontName, fontPath, fontSize, text, dpr);
+    const boundingBox = getBoundingBox(fontName, fontSize, text, dpr);
 
     const canvasSize = getCanvasSize(canvasWidth, canvasHeight, boundingBox, maxWidth, lineHeight);
-    console.log('canvas size:', canvasSize);
 
     const canvas = createCanvas(
         canvasSize.width * (1 + bleeding * 2),
-        canvasSize.height || boundingBox.height * (1 + bleeding * 2)
+        (canvasSize.height || boundingBox.height) * (1 + bleeding * 2)
     );
     const ctx = canvas.getContext('2d');
 
     const textArr = [];
     let currentLine = '';
-    ctx.font = fontSize + ' ' + fontName;
+    ctx.font = fontSize + ' "' + fontName + '"';
     if (maxWidth && boundingBox.width > maxWidth) {
-        console.log(maxWidth, boundingBox.width);
         // Multi lines
         for (let i = 0; i < text.length; ++i) {
             currentLine += text[i];
@@ -109,14 +128,23 @@ function convertOneFont (options) {
     }
 
     for (let i = 0; i < textArr.length; ++i) {
-        const path = font.getPath(textArr[i],
-            Math.ceil(canvas.width * bleeding + offsetX),
-            Math.ceil(canvas.height * bleeding + offsetY
-                + boundingBox.height * (i + 1) * lineHeight),
-            parseInt(fontSize, 10));
-        path.fill = color;
-        path.draw(ctx);
+        const textLeft = Math.ceil(canvasSize.width * bleeding + offsetX);
+        const textTop = Math.ceil(canvasSize.height * bleeding + offsetY
+            + boundingBox.height * (i + 1) * lineHeight);
+
+        if (fontObj) {
+            const path = fontObj.getPath(textArr[i], textLeft, Math.min(canvas.height, textTop),
+                parseInt(fontSize, 10));
+            path.fill = color;
+            path.draw(ctx);
+        }
+        else {
+            console.log('Using font ', ctx.font);
+            ctx.fillStyle = color;
+            ctx.fillText(textArr[i], textLeft, textTop);
+        }
     }
+    // console.log(ctx.fillStyle);
 
     const trimedCanvas = trimCanvas(canvas);
     const base64 = trimedCanvas.toDataURL('image/png');
@@ -126,11 +154,7 @@ function convertOneFont (options) {
     fs.writeFileSync(output, buf);
 }
 
-function getBoundingBox(fontName, fontPath, fontSize, text, dpr) {
-    registerFont(fontPath, {
-        family: fontName
-    });
-
+function getBoundingBox(fontName, fontSize, text, dpr) {
     const canvas = createCanvas(1, 1);
     const ctx = canvas.getContext('2d');
     ctx.font = fontSize + ' ' + fontName;

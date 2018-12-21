@@ -4,7 +4,7 @@ const font2img = require('./font2img');
 
 program
     // .arguments('<file>')
-    .option('-f, --font-path <path>', 'The TTF font path')
+    .option('-f, --font <path>', 'The TTF font path, or font name for system fonts')
     .option('-o, --output <path>', 'The output image path')
     .option('-t, --text <text>', 'Text')
     .option('-c, --color <color>', 'Text color, which Canvas setFillStyle supports')
@@ -19,7 +19,7 @@ program
     .option('-b, --bleeding <number>', 'Bleeding pixels')
     .action(function(file) {
         font2img({
-            fontPath: program.fontPath,
+            font: program.font,
             output: program.output,
             text: program.text,
             color: program.color,
