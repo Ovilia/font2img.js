@@ -76,7 +76,7 @@ function convertOneFont (options) {
     if (dpr !== 1) {
         const unitIndex = fontSize.match(/\D/).index;
         const unit = fontSize.substr(unitIndex);
-        fontSize = parseInt(fontSize, 10) * 2 + unit;
+        fontSize = parseInt(fontSize, 10) * dpr + unit;
 
         if (maxWidth) {
             maxWidth = parseInt(maxWidth) * dpr;
@@ -98,7 +98,7 @@ function convertOneFont (options) {
 
     const boundingBox = getBoundingBox(fontName, fontSize, text, dpr);
 
-    const canvasSize = getCanvasSize(canvasWidth, canvasHeight, boundingBox, maxWidth, lineHeight);
+    const canvasSize = getCanvasSize(text, canvasWidth, canvasHeight, boundingBox, maxWidth, lineHeight);
 
     const canvas = createCanvas(
         canvasSize.width * (1 + bleeding * 2),
@@ -109,14 +109,21 @@ function convertOneFont (options) {
     const textArr = [];
     let currentLine = '';
     ctx.font = fontSize + ' "' + fontName + '"';
-    if (maxWidth && boundingBox.width > maxWidth) {
+    if (maxWidth && boundingBox.width > maxWidth || text.indexOf('#') > -1) {
         // Multi lines
         for (let i = 0; i < text.length; ++i) {
-            currentLine += text[i];
-            const lineMeasure = ctx.measureText(currentLine);
-            if (lineMeasure.width > maxWidth) {
+            if (text[i] === '#') {
+                // Split for new line
                 textArr.push(currentLine);
                 currentLine = '';
+            }
+            else {
+                currentLine += text[i];
+                const lineMeasure = ctx.measureText(currentLine);
+                if (lineMeasure.width > maxWidth) {
+                    textArr.push(currentLine);
+                    currentLine = '';
+                }
             }
         }
         if (currentLine) {
@@ -150,7 +157,7 @@ function convertOneFont (options) {
     const base64 = trimedCanvas.toDataURL('image/png');
     const data = base64.replace(/^data:image\/\w+;base64,/, '');
     const buf = Buffer.from(data, 'base64');
-    console.log('Writing to file', output);
+    // console.log('Writing to file', output);
     fs.writeFileSync(output, buf);
 }
 
@@ -170,15 +177,19 @@ function getBoundingBox(fontName, fontSize, text, dpr) {
     return measure;
 }
 
-function getCanvasSize(canvasWidth, canvasHeight, boundingBox, maxWidth, lineHeight) {
+function getCanvasSize(text, canvasWidth, canvasHeight, boundingBox, maxWidth, lineHeight) {
+    const splitLines = (text.match(/#/g) || []).length;
     if (!maxWidth || canvasWidth || canvasHeight) {
         return {
             width: canvasWidth || boundingBox.width,
-            height: canvasHeight || boundingBox.height
+            height: canvasHeight || boundingBox.height * (1 + splitLines)
         };
     }
 
-    const lines = Math.ceil(boundingBox.width / maxWidth);
+    let lines = Math.ceil(boundingBox.width / maxWidth);
+    if (text.indexOf('#') > -1) {
+        lines += splitLines;
+    }
     return {
         width: maxWidth,
         height: Math.ceil(boundingBox.height * lines) * lineHeight
